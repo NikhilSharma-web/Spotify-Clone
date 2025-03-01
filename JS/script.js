@@ -2,16 +2,9 @@ let audio = new Audio();
 let currentSong = null;
 let songs = [];
 
-function secondsToMinutesSeconds(seconds) {
-    if (isNaN(seconds) || seconds < 0) return "00:00";
-    let minutes = Math.floor(seconds / 60);
-    let remainingSeconds = Math.floor(seconds % 60);
-    return `${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`;
-}
-
 async function getSongs() {
     try {
-        let response = await fetch("http://127.0.0.1:3000/84.Spotify Clone1/songs/");
+        let response = await fetch("http://127.0.0.1:3000/84.Spotify Clone1/Public/");
         let text = await response.text();
         let div = document.createElement("div");
         div.innerHTML = text;
@@ -21,7 +14,7 @@ async function getSongs() {
         for (let i = 0; i < as.length; i++) {
             let element = as[i];
             if (element.href.endsWith(".mp3")) {
-                songsList.push(decodeURIComponent(element.href.split("/songs/")[1]));
+                songsList.push(decodeURIComponent(element.href.split("/Public/")[1]));
             }
         }
 
@@ -32,10 +25,11 @@ async function getSongs() {
     }
 }
 
+// Function to play music instantly when clicked
 const playMusic = (track) => {
     if (!track) return;
 
-    let songPath = `http://127.0.0.1:3000/84.Spotify Clone1/songs/` + track;
+    let songPath = `http://127.0.0.1:3000/84.Spotify Clone1/Public/` + track;
 
     if (currentSong === track) {
         if (audio.paused) {
@@ -47,13 +41,14 @@ const playMusic = (track) => {
         }
         return;
     }
-    
+
+    // Load new song & play immediately
     audio.src = songPath;
-    audio.preload = "auto";
-    audio.load(); 
+    audio.preload = "auto";  // Preload the song to reduce loading delay
+    audio.load();  // Force browser to fetch song instantly
 
     audio.play().then(() => {
-        document.getElementById("play").src = "img/pause.svg";
+        document.getElementById("play").src = "img/pause.svg";  // Change icon to pause
     }).catch(error => console.error("Playback error:", error));
 
     currentSong = track;
@@ -95,15 +90,51 @@ async function main() {
     });
 
     audio.addEventListener("timeupdate", () => {
-        document.querySelector(".songTime").innerHTML =`${secondsToMinutesSeconds(audio.currentTime)} / ${secondsToMinutesSeconds(audio.duration)}`;
+        document.querySelector(".songTime").innerHTML = 
+            `${secondsToMinutesSeconds(audio.currentTime)} / ${secondsToMinutesSeconds(audio.duration)}`;
         document.querySelector(".circle").style.left = (audio.currentTime / audio.duration) * 100 + "%";
     });
+    audio.addEventListener("timeupdate", () => {
+    let currentTime = audio.currentTime;
+    let duration = audio.duration;
 
-    document.querySelector(".seekbar").addEventListener("click", e => {
-        let percent = (e.offsetX / e.target.getBoundingClientRect().width) * 100;
-        document.querySelector(".circle").style.left = percent + "%";
+    if (!isNaN(duration)) {
+        let progress = (currentTime / duration) * 100;
+        document.querySelector(".circle").style.left = `${progress}%`;
+        document.querySelector(".songTime").innerHTML = 
+            `${secondsToMinutesSeconds(currentTime)} / ${secondsToMinutesSeconds(duration)}`;
+    }
+});
+
+document.querySelector(".seekbar").addEventListener("click", (e) => {
+    let seekbar = e.target.getBoundingClientRect();
+    let clickX = e.clientX - seekbar.left;
+    let percent = (clickX / seekbar.width) * 100;
+    
+    document.querySelector(".circle").style.left = `${percent}%`;
+    audio.currentTime = (audio.duration * percent) / 100;
+});
+
+let isDragging = false;
+
+document.querySelector(".circle").addEventListener("mousedown", () => {
+    isDragging = true;
+});
+
+document.addEventListener("mousemove", (e) => {
+    if (isDragging) {
+        let seekbar = document.querySelector(".seekbar").getBoundingClientRect();
+        let moveX = e.clientX - seekbar.left;
+        let percent = Math.max(0, Math.min((moveX / seekbar.width) * 100, 100));
+
+        document.querySelector(".circle").style.left = `${percent}%`;
         audio.currentTime = (audio.duration * percent) / 100;
-    });
+    }
+});
+
+document.addEventListener("mouseup", () => {
+    isDragging = false;
+});
 
     document.getElementById("previous").addEventListener("click", () => {
         let index = songs.indexOf(currentSong);
